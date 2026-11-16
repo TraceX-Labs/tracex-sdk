@@ -12,7 +12,7 @@ import { createInterface } from "node:readline/promises";
 import { detect, FRAMEWORK_NAMES, installCommand, type Framework } from "./detect";
 import { makePlan, type Change } from "./plan";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.1.1";
 export { detect } from "./detect";
 export { makePlan, addImport, addToBody } from "./plan";
 const DEFAULT_ENDPOINT = "https://ingest.tracexpro.com/api/events";
@@ -236,6 +236,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   for (const note of plan.notes) console.log(`  • ${note}`);
   console.log(`  • If the key is limited to your sites, add every address the app runs on (TraceX → Issues → Alerts and SDK → Sites).`);
   console.log(`  • Add debug: true to TraceX.init to see what's sent, and why something isn't.`);
+  if (!["express", "node"].includes(project.framework)) {
+    console.log(`  • Readable production stack traces: upload source maps in CI with npx @tracexpro/sourcemaps (https://docs.tracexpro.com/errors/source-maps/).`);
+  }
   console.log(`  • Guides and troubleshooting: https://docs.tracexpro.com/errors/overview/\n`);
   return 0;
 }

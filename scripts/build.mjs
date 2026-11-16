@@ -34,22 +34,24 @@ for (const [name, cfg] of Object.entries(packages)) {
   }
 }
 
-// The setup wizard: a library (for tests) and the npx command
-rmSync("packages/wizard/dist", { recursive: true, force: true });
+// The npx commands (setup wizard, source map upload): a library (for tests) and the CLI
+for (const pkg of ["wizard", "sourcemaps"]) {
+rmSync(`packages/${pkg}/dist`, { recursive: true, force: true });
 for (const [entry, out, banner] of [
   ["index.ts", "index.js", ""],
   ["cli.ts", "cli.js", "#!/usr/bin/env node"],
 ]) {
   await build({
-    entryPoints: [`packages/wizard/src/${entry}`],
+    entryPoints: [`packages/${pkg}/src/${entry}`],
     bundle: true,
     platform: "node",
     target: "node18",
     format: "esm",
-    outfile: `packages/wizard/dist/${out}`,
+    outfile: `packages/${pkg}/dist/${out}`,
     banner: banner ? { js: banner } : undefined,
     legalComments: "none",
   });
+}
 }
 
 // Declarations: tsc emits per file; the core's types are re-exported from each index
@@ -69,4 +71,4 @@ for (const name of Object.keys(packages)) {
   }
 }
 rmSync("build-types", { recursive: true, force: true });
-console.log("built @tracexpro/browser, @tracexpro/node and @tracexpro/wizard");
+console.log("built @tracexpro/browser, node, wizard and sourcemaps");

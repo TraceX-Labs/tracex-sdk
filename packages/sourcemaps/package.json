@@ -1,0 +1,31 @@
+{
+  "name": "@tracexpro/sourcemaps",
+  "version": "0.1.0",
+  "description": "Upload your build's source maps to TraceX, so error stack traces show your original files, lines and functions.",
+  "license": "MIT",
+  "homepage": "https://docs.tracexpro.com/errors/source-maps/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TraceX-Labs/tracex-sdk.git",
+    "directory": "packages/sourcemaps"
+  },
+  "keywords": [
+    "tracex",
+    "source-maps",
+    "sourcemaps",
+    "error-tracking",
+    "ci"
+  ],
+  "type": "module",
+  "bin": {
+    "tracex-sourcemaps": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
