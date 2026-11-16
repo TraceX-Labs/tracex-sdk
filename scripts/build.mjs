@@ -51,4 +51,4 @@ for (const name of Object.keys(packages)) {
   }
 }
 rmSync("build-types", { recursive: true, force: true });
-console.log("built @tracex/browser and @tracex/node");
+console.log("built @tracexpro/browser and @tracexpro/node");

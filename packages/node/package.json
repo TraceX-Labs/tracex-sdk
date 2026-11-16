@@ -4,7 +4,12 @@
   "description": "TraceX for Node.js: uncaught exceptions, unhandled rejections and Express request errors, grouped into issues in TraceX.",
   "license": "MIT",
   "homepage": "https://docs.tracexpro.com/errors/",
-  "keywords": ["error-tracking", "monitoring", "tracex", "node"],
+  "keywords": [
+    "error-tracking",
+    "monitoring",
+    "tracex",
+    "node"
+  ],
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -16,7 +21,18 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "sideEffects": false,
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TraceX-Labs/tracex-sdk.git",
+    "directory": "packages/node"
+  }
 }
