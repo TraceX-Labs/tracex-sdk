@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as TraceX from "../packages/node/dist/index.js";
-import { browserOf, osOf } from "../packages/browser/dist/index.js";
+import { build } from "esbuild";
+
+const agentBundle = await build({ entryPoints: ["packages/browser/src/agent.ts"], bundle: true, format: "esm", write: false });
+const { browserOf, osOf } = await import(
+  "data:text/javascript;base64," + Buffer.from(agentBundle.outputFiles[0].text).toString("base64")
+);
 
 const KEY = "txp_pub_testkey";
 
@@ -98,4 +103,35 @@ test("browser and OS from the user agent", () => {
   assert.deepEqual(browserOf(ua), { name: "Chrome", version: "131" });
   assert.deepEqual(osOf(ua), { name: "macOS" });
   assert.equal(browserOf("Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) Version/17.1 Mobile/15E148 Safari/604.1").name, "Safari");
+});
+
+test("debug explains what was dropped and what the server refused", async () => {
+  const lines = [];
+  const info = console.info;
+  const warn = console.warn;
+  console.info = (...a) => lines.push(a.join(" "));
+  console.warn = (...a) => lines.push(a.join(" "));
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: "origin_not_allowed" }), { status: 403 });
+  try {
+    TraceX.init({ key: KEY, debug: true, captureUncaught: false, captureUnhandledRejections: false, ignoreErrors: ["noise"] });
+    TraceX.captureMessage("noise here");
+    TraceX.captureMessage("real one", "error");
+    await TraceX.flush();
+  } finally {
+    console.info = info;
+    console.warn = warn;
+    TraceX.close();
+  }
+  const all = lines.join("\n");
+  assert.match(all, /started 0\.2\.0: key txp_pub_testke/);
+  assert.match(all, /not sent: info: noise here \(it matches ignoreErrors\)/);
+  assert.match(all, /captured error: real one/);
+  assert.match(all, /refused: this site isn't in the key's allowed sites/);
+});
+
+test("isInitialized", () => {
+  assert.equal(TraceX.isInitialized(), false);
+  TraceX.init({ key: KEY, captureUncaught: false, captureUnhandledRejections: false });
+  assert.equal(TraceX.isInitialized(), true);
+  TraceX.close();
 });

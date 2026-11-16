@@ -2,7 +2,7 @@
 
 TraceX error tracking for the browser: uncaught errors, unhandled promise rejections,
 crashed React components and failed API calls, with the clicks, page changes and
-requests before each one. About 4.5 KB gzipped, no dependencies.
+requests before each one. About 5 KB gzipped, no dependencies.
 
 ```bash
 npm install @tracexpro/browser

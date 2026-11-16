@@ -58,5 +58,6 @@ export interface BaseOptions {
   ignoreErrors?: Array<string | RegExp>;
   /** Turn sending off (tests, local development). */
   enabled?: boolean;
+  /** Log to the console what TraceX captures, sends and drops, and why. */
   debug?: boolean;
 }

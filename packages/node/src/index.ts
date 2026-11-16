@@ -7,12 +7,12 @@
  *   app.use(TraceX.expressErrorHandler());   // after your routes
  */
 import os from "node:os";
-import { Client } from "../../core/src/client";
+import { Client, type SendResult } from "../../core/src/client";
 import type { BaseOptions, Breadcrumb, CaptureContext, Level } from "../../core/src/types";
 
 export type { BaseOptions, Breadcrumb, CaptureContext, Level, TraceXEvent } from "../../core/src/types";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 
 export interface NodeOptions extends BaseOptions {
   /** Report uncaught exceptions (then exit, as Node would). Default true. */
@@ -33,13 +33,14 @@ function contexts(): Record<string, unknown> {
   };
 }
 
-async function send(url: string, body: string): Promise<void> {
-  await fetch(url, {
+async function send(url: string, body: string): Promise<SendResult> {
+  const response = await fetch(url, {
     method: "POST",
     body,
     headers: { "content-type": "application/json" },
     signal: AbortSignal.timeout(5000),
   });
+  return { status: response.status, body: await response.json().catch(() => undefined) };
 }
 
 /** Start TraceX. Call once, before the rest of your app runs. */
@@ -53,6 +54,7 @@ export function init(options: NodeOptions): void {
     contexts,
   );
   const c = client;
+  c.log(`started ${VERSION}: key ${options.key.slice(0, 14)}…, sending to ${c.options.endpoint}`);
   if (options.captureUncaught !== false) {
     const onUncaught = async (error: Error) => {
       c.captureException(error, { level: "fatal", tags: { mechanism: "uncaughtException" } });
@@ -125,4 +127,9 @@ export function flush(): Promise<void> {
 export function close(): void {
   while (undo.length) undo.pop()?.();
   client = null;
+}
+
+/** Whether init() has run in this process. */
+export function isInitialized(): boolean {
+  return client !== null;
 }

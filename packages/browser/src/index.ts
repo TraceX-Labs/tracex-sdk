@@ -5,12 +5,13 @@
  *   import * as TraceX from "@tracexpro/browser";
  *   TraceX.init({ key: "txp_pub_…", release: "web@1.4.0" });
  */
-import { Client, scrubUrl } from "../../core/src/client";
+import { Client, scrubUrl, type SendResult } from "../../core/src/client";
+import { browserOf, osOf } from "./agent";
 import type { BaseOptions, Breadcrumb, CaptureContext, Level } from "../../core/src/types";
 
 export type { BaseOptions, Breadcrumb, CaptureContext, Level, TraceXEvent } from "../../core/src/types";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 
 export interface BrowserOptions extends BaseOptions {
   /** Report API calls answered with 5xx (and, if set, these 4xx codes). Default true. */
@@ -39,33 +40,7 @@ function contexts(): Record<string, unknown> {
   };
 }
 
-export function browserOf(ua: string): { name: string; version?: string } {
-  const rules: Array<[string, RegExp]> = [
-    ["Edge", /Edg\/(\d+)/],
-    ["Opera", /OPR\/(\d+)/],
-    ["Samsung Internet", /SamsungBrowser\/(\d+)/],
-    ["Chrome", /Chrome\/(\d+)/],
-    ["Firefox", /Firefox\/(\d+)/],
-    ["Safari", /Version\/(\d+).*Safari/],
-  ];
-  for (const [name, pattern] of rules) {
-    const match = pattern.exec(ua);
-    if (match) return { name, version: match[1] };
-  }
-  return { name: "Unknown" };
-}
-
-export function osOf(ua: string): { name: string; version?: string } {
-  if (/Windows NT 10/.test(ua)) return { name: "Windows", version: "10+" };
-  if (/Windows/.test(ua)) return { name: "Windows" };
-  if (/iPhone|iPad|iPod/.test(ua)) return { name: "iOS", version: /OS (\d+)/.exec(ua)?.[1] };
-  if (/Mac OS X/.test(ua)) return { name: "macOS" };
-  if (/Android/.test(ua)) return { name: "Android", version: /Android (\d+)/.exec(ua)?.[1] };
-  if (/Linux/.test(ua)) return { name: "Linux" };
-  return { name: "Unknown" };
-}
-
-function send(url: string, body: string, final: boolean): Promise<void> | void {
+function send(url: string, body: string, final: boolean): Promise<SendResult> | SendResult {
   // text/plain: a "simple" request, so the browser sends it without a CORS preflight
   if (final && typeof navigator !== "undefined" && navigator.sendBeacon) {
     navigator.sendBeacon(url, new Blob([body], { type: "text/plain" }));
@@ -76,7 +51,10 @@ function send(url: string, body: string, final: boolean): Promise<void> | void {
     body,
     keepalive: body.length < 60_000,
     headers: { "content-type": "text/plain" },
-  }).then(() => undefined);
+  }).then(async (response) => ({
+    status: response.status,
+    body: await response.json().catch(() => undefined),
+  }));
 }
 
 let originalFetch: typeof fetch = (...args) => fetch(...args);
@@ -104,9 +82,15 @@ function pathOf(url: string): string {
 /** Start TraceX. Call once, as early as possible. */
 export function init(options: BrowserOptions): void {
   if (client) close();
-  if (typeof window === "undefined") return; // server rendering: use @tracexpro/node there
+  // Server rendering: nothing to catch here (use @tracexpro/node on the server)
+  if (typeof window === "undefined") return;
   client = new Client(options, "javascript", { name: "tracex.browser", version: VERSION }, send, contexts);
   const c = client;
+  c.log(
+    `started ${VERSION}: key ${options.key.slice(0, 14)}…, sending to ${c.options.endpoint}` +
+      (options.enabled === false ? " (enabled: false, nothing will be sent)" : "") +
+      `. Try TraceX.captureMessage("TraceX test") and look under Issues.`,
+  );
 
   const onError = (event: ErrorEvent) => {
     // Script errors from other sites without CORS carry no details: skip them
@@ -276,4 +260,9 @@ export function reactErrorHandler(error: unknown, info?: { componentStack?: stri
 export function close(): void {
   while (undo.length) undo.pop()?.();
   client = null;
+}
+
+/** Whether init() has run in this page. */
+export function isInitialized(): boolean {
+  return client !== null;
 }

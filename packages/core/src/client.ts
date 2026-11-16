@@ -22,7 +22,17 @@ export function uuid(): string {
   return out;
 }
 
-export type Sender = (url: string, body: string, final: boolean) => Promise<void> | void;
+/** What the server answered (unknown for a beacon sent as the page closes). */
+export type SendResult = { status: number; body?: unknown } | void;
+export type Sender = (url: string, body: string, final: boolean) => Promise<SendResult> | SendResult;
+
+/** Why the server refused events, in words a developer can act on. */
+const REFUSALS: Record<string, string> = {
+  unknown_key: "the key isn't valid or was revoked. Copy it again from TraceX → Issues → Alerts and SDK.",
+  origin_not_allowed: "this site isn't in the key's allowed sites. Add it under TraceX → Issues → Alerts and SDK → SDK keys → Sites.",
+  rate_limited: "too many requests from this key; events are being dropped for a minute.",
+  too_large: "the batch is over 512 KB.",
+};
 
 /** What every TraceX SDK shares: building, filtering, batching and sending events. */
 export class Client {
@@ -89,21 +99,24 @@ export class Client {
 
   /** Build, filter and queue an event; returns its id (null when it was dropped). */
   capture(partial: Partial<TraceXEvent>, context: CaptureContext = {}): string | null {
-    if (this.options.enabled === false) return null;
     const text = partial.exception?.value || partial.message || "";
-    if (this.ignored(`${partial.exception?.type || ""}: ${text}`)) return null;
-    if (Math.random() >= this.options.sampleRate) return null;
+    const label = `${partial.exception?.type || partial.level || "event"}: ${text.slice(0, 80)}`;
+    if (this.options.enabled === false) return this.skip(label, "enabled is false");
+    if (this.ignored(`${partial.exception?.type || ""}: ${text}`)) return this.skip(label, "it matches ignoreErrors");
+    if (Math.random() >= this.options.sampleRate) return this.skip(label, `sampleRate is ${this.options.sampleRate}`);
     const signature = `${partial.exception?.type}|${text}|${partial.exception?.stacktrace?.[0]?.filename}:${partial.exception?.stacktrace?.[0]?.lineno}`;
     const now = Date.now();
     const last = this.recent.get(signature);
-    if (last && now - last < DEDUPE_MS) return null;
+    if (last && now - last < DEDUPE_MS) return this.skip(label, "the same error was sent less than 5 seconds ago");
     this.recent.set(signature, now);
     if (this.recent.size > 200) this.recent.clear();
     if (now - this.minuteStarted > 60_000) {
       this.minuteStarted = now;
       this.sentThisMinute = 0;
     }
-    if (this.sentThisMinute >= this.options.maxEventsPerMinute) return null;
+    if (this.sentThisMinute >= this.options.maxEventsPerMinute) {
+      return this.skip(label, `maxEventsPerMinute (${this.options.maxEventsPerMinute}) was reached`);
+    }
 
     let event: TraceXEvent | null = {
       event_id: uuid(),
@@ -125,13 +138,15 @@ export class Client {
     if (this.options.beforeSend) {
       try {
         event = this.options.beforeSend(event);
-      } catch {
+      } catch (error) {
         // A failing beforeSend never breaks the app; the event is sent as it was
+        this.log("beforeSend threw; sending the event unchanged", error);
       }
-      if (!event) return null;
+      if (!event) return this.skip(label, "beforeSend returned null");
     }
     this.sentThisMinute += 1;
     this.queue.push(event);
+    this.log(`captured ${label} (${event.event_id})`);
     this.addBreadcrumb({
       category: "tracex",
       message: `${event.exception?.type || event.level}: ${text.slice(0, 120)}`,
@@ -139,6 +154,16 @@ export class Client {
     if (this.queue.length >= BATCH_SIZE) void this.flush();
     else if (!this.timer) this.timer = setTimeout(() => void this.flush(), FLUSH_MS);
     return event.event_id;
+  }
+
+  /** With ``debug: true``, what TraceX does (and why it didn't send something). */
+  log(message: string, ...extra: unknown[]): void {
+    if (this.options.debug) console.info(`[TraceX] ${message}`, ...extra);
+  }
+
+  private skip(label: string, why: string): null {
+    this.log(`not sent: ${label} (${why})`);
+    return null;
   }
 
   /** Send everything queued now. ``final``: the page or process is going away. */
@@ -150,10 +175,28 @@ export class Client {
     while (this.queue.length) {
       const batch = this.queue.splice(0, 50);
       try {
-        await this.send(this.url, JSON.stringify({ events: batch }), final);
+        const result = await this.send(this.url, JSON.stringify({ events: batch }), final);
+        this.report(batch.length, result);
       } catch (error) {
-        if (this.options.debug) console.warn("TraceX: couldn't send events", error);
+        // Ad blockers and offline browsers end up here
+        this.log(`couldn't reach ${this.options.endpoint} (blocked by an ad blocker, a CSP rule, or offline?)`, error);
       }
+    }
+  }
+
+  private report(count: number, result: SendResult): void {
+    if (!this.options.debug) return;
+    if (!result) {
+      this.log(`sent ${count} event(s) as the page closed`);
+      return;
+    }
+    const body = (result.body || {}) as { error?: string; accepted?: number; dropped?: number };
+    if (result.status < 300) {
+      const dropped = body.dropped ? `; ${body.dropped} over this month's allowance, not stored` : "";
+      this.log(`sent ${count} event(s): ${body.accepted ?? count} accepted${dropped}. See them under Issues in TraceX.`);
+    } else {
+      const why = (body.error && REFUSALS[body.error]) || `HTTP ${result.status}`;
+      console.warn(`[TraceX] ${count} event(s) refused: ${why}`);
     }
   }
 
