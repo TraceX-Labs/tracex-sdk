@@ -1,0 +1,22 @@
+{
+  "name": "@tracexpro/node",
+  "version": "0.1.0",
+  "description": "TraceX for Node.js: uncaught exceptions, unhandled rejections and Express request errors, grouped into issues in TraceX.",
+  "license": "MIT",
+  "homepage": "https://docs.tracexpro.com/errors/",
+  "keywords": ["error-tracking", "monitoring", "tracex", "node"],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "sideEffects": false,
+  "engines": { "node": ">=18" }
+}
