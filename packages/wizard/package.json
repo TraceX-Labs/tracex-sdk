@@ -1,0 +1,21 @@
+{
+  "name": "@tracexpro/wizard",
+  "version": "0.1.0",
+  "description": "Set up TraceX error tracking in your app: detects Next.js, Vite, Vue, SvelteKit, Angular, React Router, Express or Node, installs the SDK, writes the files and sends a test event.",
+  "license": "MIT",
+  "homepage": "https://docs.tracexpro.com/errors/overview/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TraceX-Labs/tracex-sdk.git",
+    "directory": "packages/wizard"
+  },
+  "keywords": ["tracex", "error-tracking", "setup", "wizard", "nextjs"],
+  "type": "module",
+  "bin": {
+    "tracex-wizard": "dist/cli.js"
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=18"
+  }
+}

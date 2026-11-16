@@ -34,6 +34,24 @@ for (const [name, cfg] of Object.entries(packages)) {
   }
 }
 
+// The setup wizard: a library (for tests) and the npx command
+rmSync("packages/wizard/dist", { recursive: true, force: true });
+for (const [entry, out, banner] of [
+  ["index.ts", "index.js", ""],
+  ["cli.ts", "cli.js", "#!/usr/bin/env node"],
+]) {
+  await build({
+    entryPoints: [`packages/wizard/src/${entry}`],
+    bundle: true,
+    platform: "node",
+    target: "node18",
+    format: "esm",
+    outfile: `packages/wizard/dist/${out}`,
+    banner: banner ? { js: banner } : undefined,
+    legalComments: "none",
+  });
+}
+
 // Declarations: tsc emits per file; the core's types are re-exported from each index
 execFileSync("npx", ["tsc", "-p", "tsconfig.json", "--noEmit", "false", "--emitDeclarationOnly", "--outDir", "build-types"], {
   stdio: "inherit",
@@ -51,4 +69,4 @@ for (const name of Object.keys(packages)) {
   }
 }
 rmSync("build-types", { recursive: true, force: true });
-console.log("built @tracexpro/browser and @tracexpro/node");
+console.log("built @tracexpro/browser, @tracexpro/node and @tracexpro/wizard");
